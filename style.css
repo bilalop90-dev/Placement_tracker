@@ -545,6 +545,9 @@ button {
 .due-chip:last-child {
   margin-bottom: 0;
 }
+.due-chip__main {
+  min-width: 0;
+}
 .due-chip__name {
   font-weight: 500;
   font-size: 14px;
@@ -553,6 +556,9 @@ button {
   font-size: 11px;
   color: var(--text-2);
   font-family: var(--font-mono);
+}
+.due-chip__badge {
+  margin-top: 6px;
 }
 
 /* ============================================================
@@ -699,6 +705,34 @@ button {
   font-size: 11px;
   color: var(--text-2);
   font-family: var(--font-mono);
+}
+
+/* End cluster (review-due dot + state badge) inside a node pill */
+.node__end {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+/* Pulsing indicator on a mastered node whose review is due */
+.node__due-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  animation: duecue 1.6s ease-in-out infinite;
+}
+@keyframes duecue {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--primary-soft);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+    opacity: 0.5;
+  }
 }
 
 /* Topic detail panel */

@@ -317,6 +317,11 @@
         var badgeHtml = revision
           ? '<span class="badge badge--revision">Needs Revision</span>'
           : '<span class="badge ' + badge[1] + '">' + badge[0] + '</span>';
+        // Mastered & due (but not flagged for revision) → pulsing review-due dot.
+        var dueDot =
+          thisMastered && !revision && isDue(topic.id)
+            ? '<span class="node__due-dot" title="Review due today"></span>'
+            : '';
         var scoreHtml =
           ts.bestScore != null
             ? '<div class="node__score">Best: ' + pct(ts.bestScore) + '%</div>'
@@ -357,7 +362,10 @@
           nodeSchedHtml(topic.id) +
           '</span>' +
           '</span>' +
+          '<span class="node__end">' +
+          dueDot +
           badgeHtml +
+          '</span>' +
           '</button>' +
           '</div>'
         );
@@ -1501,27 +1509,36 @@
     var due = dueTopics();
     var body;
     if (!due.length) {
-      body = '<div class="empty"><span class="empty__icon">✅</span>No reviews due. You\'re all caught up.</div>';
+      body = '<div class="empty"><span class="empty__icon">✅</span>You\'re all caught up. Keep studying!</div>';
     } else {
       body = due
         .slice(0, 6)
         .map(function (d) {
+          // SR ladder has SR.length stages; srIndex is the next one due (0-based).
+          var stage = Math.min(d.ts.srIndex + 1, SR.length);
           return (
-            '<div class="due-chip"><div><div class="due-chip__name">' +
+            '<div class="due-chip"><div class="due-chip__main"><div class="due-chip__name">' +
             esc(d.topic.name) +
             '</div><div class="due-chip__track">' +
             esc(d.track.short) +
-            (d.ts.needsRevision ? ' · revision' : '') +
-            '</div></div>' +
+            ' · Review ' +
+            stage +
+            ' of ' +
+            SR.length +
+            '</div>' +
+            (d.ts.needsRevision
+              ? '<span class="badge badge--revision due-chip__badge">Needs Revision</span>'
+              : '') +
+            '</div>' +
             '<button class="btn btn--success" style="padding:7px 14px;" data-review-now="' +
             d.topic.id +
-            '">Review</button></div>'
+            '">Start Review</button></div>'
           );
         })
         .join('');
     }
     return (
-      '<div class="card"><div class="section-label">Due Today (' +
+      '<div class="card"><div class="section-label">Due for Review Today (' +
       due.length +
       ')</div>' +
       body +
