@@ -1098,6 +1098,208 @@ button {
 }
 
 /* ============================================================
+   Study Plan & Timeline
+   ============================================================ */
+.plan-card .section-label {
+  margin-bottom: 10px;
+}
+.plan-intro {
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  max-width: 680px;
+}
+.plan-durations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.plan-pill {
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  transition: transform var(--t-fast), background var(--t-fast), border-color var(--t-fast),
+    color var(--t-fast);
+}
+.plan-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+.plan-pill--lg {
+  padding: 12px 22px;
+  font-size: 14px;
+}
+
+.plan-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.plan-card__stats {
+  display: flex;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+.plan-card__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.plan-stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--primary);
+}
+.plan-stat-sub {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.plan-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Node schedule chip */
+.node__sched {
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node__sched--behind {
+  color: var(--danger);
+}
+.node__sched--due {
+  color: var(--warning);
+}
+.node__sched--done {
+  color: var(--secondary);
+}
+
+/* Topic panel schedule block */
+.sched-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sched-warn {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 11px 13px;
+  border-radius: 9px;
+  line-height: 1.55;
+}
+
+/* Timeline view */
+.timeline-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.tl-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tl-stat__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.tl-stat__big {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+.tl-stat__big--mastered {
+  color: var(--secondary);
+}
+.tl-stat__big--revision {
+  color: var(--danger);
+}
+.tl-stat__big--attempted {
+  color: var(--warning);
+}
+.tl-stat__sub {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.sched-list {
+  display: flex;
+  flex-direction: column;
+}
+.sched-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sched-row:last-child {
+  border-bottom: none;
+}
+.sched-row__num {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.sched-row__main {
+  flex-grow: 1;
+  min-width: 0;
+}
+.sched-row__name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.sched-row__meta {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.sched-row--behind .sched-row__num {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sched-row--due-soon .sched-row__num {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.sched-row--done-ahead .sched-row__num,
+.sched-row--done-late .sched-row__num {
+  background: var(--secondary-soft);
+  color: var(--secondary);
+}
+
+/* ============================================================
    Responsive
    ============================================================ */
 @media (max-width: 980px) {
@@ -1109,6 +1311,18 @@ button {
   }
   .dash-grid--3 {
     grid-template-columns: 1fr;
+  }
+  .timeline-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .timeline-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .plan-card__stats {
+    gap: 24px;
   }
 }
 

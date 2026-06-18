@@ -64,7 +64,8 @@
       version: 1,
       topics: {}, // topicId -> { state, bestScore, attempts:[], scores:[], masteredAt, nextReviewDate, srIndex, needsRevision, cooldownUntil }
       streak: { count: 0, best: 0, lastActiveDay: null },
-      activity: [] // { topicId, trackId, name, score, passed, ts, type }
+      activity: [], // { topicId, trackId, name, score, passed, ts, type }
+      plan: null // { months, startDate, baseline: { topicId: {start,end,days} } }
     };
     eachTopic(function (topic, track, idx) {
       s.topics[topic.id] = {
@@ -92,6 +93,7 @@
         if (!parsed.topics) parsed.topics = {};
         if (!parsed.streak) parsed.streak = def.streak;
         if (!parsed.activity) parsed.activity = [];
+        if (parsed.plan === undefined) parsed.plan = null;
         // Add any newly introduced topics (e.g. v1.1 expansion) as locked,
         // and backfill any missing fields on existing topic entries.
         eachTopic(function (topic) {
@@ -273,6 +275,7 @@
     if (currentView === 'dashboard') renderDashboard();
     else if (currentView === 'java') renderTrack('java');
     else if (currentView === 'aptitude') renderTrack('aptitude');
+    else if (currentView === 'timeline') renderTimeline();
   }
 
   /* ============================================================
@@ -350,6 +353,7 @@
           esc(topic.name) +
           '</span>' +
           scoreHtml +
+          nodeSchedHtml(topic.id) +
           '</span>' +
           '</span>' +
           badgeHtml +
@@ -438,6 +442,7 @@
       '<div class="topic-panel__name">' + esc(topic.name) + '</div>' +
       '<div class="topic-panel__desc">' + esc(topic.description) + '</div>' +
       stat +
+      topicScheduleBlock(topic.id) +
       '<div class="topic-panel__divider"></div>' +
       '<div class="topic-panel__actions">' + actions + '</div>' +
       '</div>';
@@ -986,6 +991,406 @@
   /* ============================================================
      Dashboard
      ============================================================ */
+  /* ============================================================
+     Study Plan & Timeline
+     A target duration (1–7 months) distributes every topic across
+     the period with start/end/max-days, then ADAPTS: remaining
+     topics are re-projected from today over the days left, so time
+     saved by finishing early is redistributed automatically.
+     ============================================================ */
+  var PLAN_MONTHS = [1, 2, 3, 4, 5, 6, 7];
+  var MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return d.getDate() + ' ' + MONTH_ABBR[d.getMonth()];
+  }
+
+  // Exact number of calendar days in the chosen period from a start date.
+  function planTotalDays(startTs, months) {
+    var d = new Date(startTs);
+    var end = new Date(d.getFullYear(), d.getMonth() + months, d.getDate());
+    return Math.round((startOfDay(end.getTime()) - startOfDay(startTs)) / DAY_MS);
+  }
+
+  // Spread `total` days across `n` topics as evenly as possible
+  // (earlier topics absorb the remainder), guaranteeing >= 1 day each.
+  function distributeDays(total, n) {
+    var base = Math.floor(total / n);
+    var rem = total % n;
+    var arr = [];
+    for (var i = 0; i < n; i++) arr.push(base + (i < rem ? 1 : 0));
+    return arr;
+  }
+
+  function createPlan(months) {
+    var start = startOfDay(Date.now());
+    var plan = { months: months, startDate: start, baseline: {} };
+    ['java', 'aptitude'].forEach(function (tid) {
+      var topics = trackTopics(tid);
+      var total = planTotalDays(start, months);
+      var days = distributeDays(total, topics.length);
+      var cursor = start;
+      topics.forEach(function (t, i) {
+        plan.baseline[t.id] = { start: cursor, end: cursor + (days[i] - 1) * DAY_MS, days: days[i] };
+        cursor = cursor + days[i] * DAY_MS;
+      });
+    });
+    state.plan = plan;
+    saveState();
+    toast(
+      'Study plan created 📅',
+      months + '-month timeline generated across both tracks.',
+      'success',
+      '📅'
+    );
+    render();
+  }
+
+  function clearPlan() {
+    state.plan = null;
+    saveState();
+    render();
+  }
+
+  // Inclusive timestamp of the final day of the plan.
+  function planEndTs() {
+    if (!state.plan) return null;
+    var start = startOfDay(state.plan.startDate);
+    return start + (planTotalDays(state.plan.startDate, state.plan.months) - 1) * DAY_MS;
+  }
+
+  // Live, adaptive projection for the NOT-yet-mastered topics of a track,
+  // distributed from today across the days remaining until the plan ends.
+  function adaptiveSchedule(trackId) {
+    var map = {};
+    if (!state.plan) return map;
+    var remaining = trackTopics(trackId).filter(function (t) {
+      return state.topics[t.id].state !== 'mastered';
+    });
+    if (!remaining.length) return map;
+    var from = Math.max(startOfDay(Date.now()), startOfDay(state.plan.startDate));
+    var pEnd = planEndTs();
+    var daysLeft = Math.max(remaining.length, Math.round((pEnd - from) / DAY_MS) + 1);
+    var dist = distributeDays(daysLeft, remaining.length);
+    var cursor = from;
+    remaining.forEach(function (t, i) {
+      map[t.id] = { start: cursor, end: cursor + (dist[i] - 1) * DAY_MS, days: dist[i] };
+      cursor = cursor + dist[i] * DAY_MS;
+    });
+    return map;
+  }
+
+  // 'done-ahead' | 'done-late' | 'behind' | 'due-soon' | 'on-track'
+  function topicScheduleStatus(topicId) {
+    var ts = state.topics[topicId];
+    var base = state.plan.baseline[topicId];
+    if (!base) return 'on-track';
+    if (ts.state === 'mastered') {
+      if (ts.masteredAt && startOfDay(ts.masteredAt) <= base.end) return 'done-ahead';
+      return 'done-late';
+    }
+    var today = startOfDay(Date.now());
+    if (today > base.end) return 'behind';
+    if (base.end - today <= DAY_MS) return 'due-soon';
+    return 'on-track';
+  }
+
+  var SCHED_LABEL = {
+    'done-ahead': ['Completed on time', 'mastered'],
+    'done-late': ['Completed late', 'attempted'],
+    behind: ['Behind schedule', 'revision'],
+    'due-soon': ['Due soon', 'attempted'],
+    'on-track': ['On track', 'unlocked']
+  };
+
+  function planProgress() {
+    var pStart = startOfDay(state.plan.startDate);
+    var pEnd = planEndTs();
+    var total = Math.round((pEnd - pStart) / DAY_MS) + 1;
+    var today = startOfDay(Date.now());
+    var dayNum = Math.min(total, Math.max(1, Math.round((today - pStart) / DAY_MS) + 1));
+    var done = 0,
+      behind = 0,
+      totalTopics = 0;
+    eachTopic(function (t) {
+      totalTopics++;
+      if (state.topics[t.id].state === 'mastered') done++;
+      else if (topicScheduleStatus(t.id) === 'behind') behind++;
+    });
+    return {
+      total: total,
+      dayNum: dayNum,
+      done: done,
+      behind: behind,
+      totalTopics: totalTopics,
+      pStart: pStart,
+      pEnd: pEnd,
+      overdue: today > pEnd
+    };
+  }
+
+  /* ---------- Roadmap node schedule chip ---------- */
+  function nodeSchedHtml(topicId) {
+    if (!state.plan) return '';
+    var base = state.plan.baseline[topicId];
+    if (!base) return '';
+    if (state.topics[topicId].state === 'mastered') {
+      var late = topicScheduleStatus(topicId) === 'done-late';
+      return '<div class="node__sched node__sched--done">✓ Completed' + (late ? ' (late)' : '') + '</div>';
+    }
+    var status = topicScheduleStatus(topicId);
+    var cls = status === 'behind' ? ' node__sched--behind' : status === 'due-soon' ? ' node__sched--due' : '';
+    return (
+      '<div class="node__sched' +
+      cls +
+      '">📅 ' +
+      fmtDate(base.start) +
+      ' – ' +
+      fmtDate(base.end) +
+      ' · ' +
+      base.days +
+      'd' +
+      (status === 'behind' ? ' · overdue' : '') +
+      '</div>'
+    );
+  }
+
+  /* ---------- Topic panel schedule block ---------- */
+  function topicScheduleBlock(topicId) {
+    if (!state.plan) return '';
+    var ts = state.topics[topicId];
+    var base = state.plan.baseline[topicId];
+    if (!base) return '';
+    var status = topicScheduleStatus(topicId);
+    var lbl = SCHED_LABEL[status];
+
+    var rows = '';
+    rows += statRow('Planned window', fmtDate(base.start) + ' – ' + fmtDate(base.end));
+    rows += statRow('Max days', base.days + (base.days === 1 ? ' day' : ' days'));
+    rows += statRow('Deadline', fmtDate(base.end));
+
+    if (ts.state !== 'mastered') {
+      var adapt = adaptiveSchedule(getTopicDef(topicId).track.id)[topicId];
+      if (adapt) {
+        rows += statRow('Projected now', fmtDate(adapt.start) + ' – ' + fmtDate(adapt.end));
+        if (adapt.days > base.days) rows += statRow('Time freed up', '+' + (adapt.days - base.days) + (adapt.days - base.days === 1 ? ' day' : ' days'));
+        else if (adapt.days < base.days) rows += statRow('Compressed by', base.days - adapt.days + (base.days - adapt.days === 1 ? ' day' : ' days'));
+      }
+    } else if (ts.masteredAt) {
+      var saved = Math.round((base.end - startOfDay(ts.masteredAt)) / DAY_MS);
+      if (saved > 0) rows += statRow('Finished early', saved + (saved === 1 ? ' day' : ' days') + ' ahead');
+    }
+
+    return (
+      '<div class="topic-panel__divider"></div>' +
+      '<div class="sched-head"><span class="section-label" style="margin:0;">Schedule</span>' +
+      '<span class="badge badge--' +
+      lbl[1] +
+      '">' +
+      lbl[0] +
+      '</span></div>' +
+      rows +
+      (status === 'behind'
+        ? '<div class="sched-warn">⚠ Exceeding this window may delay finishing the roadmap on time. The remaining topics have been re-tightened — catch up to stay on track.</div>'
+        : '')
+    );
+  }
+
+  /* ---------- Dashboard plan card ---------- */
+  function planCard() {
+    if (!state.plan) {
+      var opts = PLAN_MONTHS.map(function (m) {
+        return '<button class="plan-pill" data-plan-months="' + m + '">' + m + ' mo</button>';
+      }).join('');
+      return (
+        '<div class="card span-2 plan-card">' +
+        '<div class="section-label">Study Plan</div>' +
+        '<p class="plan-intro">Choose a target duration and the tracker distributes all ' +
+        '29 topics across both roadmaps with daily deadlines — then adapts the schedule as you finish topics early or fall behind.</p>' +
+        '<div class="plan-durations">' +
+        opts +
+        '</div></div>'
+      );
+    }
+    var p = planProgress();
+    var pctDone = Math.round((p.done / p.totalTopics) * 100);
+    var dayPct = Math.round((p.dayNum / p.total) * 100);
+    var statusTxt, statusCls;
+    if (p.overdue) {
+      statusTxt = 'Timeline ended';
+      statusCls = 'attempted';
+    } else if (p.behind > 0) {
+      statusTxt = p.behind + (p.behind === 1 ? ' topic behind' : ' topics behind');
+      statusCls = 'revision';
+    } else {
+      statusTxt = 'On track';
+      statusCls = 'mastered';
+    }
+    return (
+      '<div class="card span-2 plan-card">' +
+      '<div class="plan-card__head"><div class="section-label" style="margin:0;">Study Plan · ' +
+      state.plan.months +
+      '-month</div><span class="badge badge--' +
+      statusCls +
+      '">' +
+      statusTxt +
+      '</span></div>' +
+      '<div class="plan-card__stats">' +
+      '<div><span class="plan-stat-num mono">Day ' +
+      p.dayNum +
+      '</span><span class="plan-stat-sub">of ' +
+      p.total +
+      ' · ' +
+      fmtDate(p.pStart) +
+      ' → ' +
+      fmtDate(p.pEnd) +
+      '</span></div>' +
+      '<div><span class="plan-stat-num mono">' +
+      p.done +
+      '/' +
+      p.totalTopics +
+      '</span><span class="plan-stat-sub">topics mastered (' +
+      pctDone +
+      '%)</span></div>' +
+      '</div>' +
+      '<div class="progress" style="margin:8px 0 4px;"><div class="progress__fill ' +
+      (p.behind > 0 ? '' : 'progress__fill--success') +
+      '" style="width:' +
+      dayPct +
+      '%"></div></div>' +
+      '<div class="plan-card__foot"><button class="btn btn--outline" data-plan-open>View full timeline →</button>' +
+      '<button class="btn btn--ghost" data-plan-reset>Reset plan</button></div>' +
+      '</div>'
+    );
+  }
+
+  /* ---------- Timeline view ---------- */
+  function trackScheduleList(trackId) {
+    var track = AppData.tracks[trackId];
+    var topics = track.topics;
+    var adapt = adaptiveSchedule(trackId);
+
+    var rows = topics
+      .map(function (t, i) {
+        var ts = state.topics[t.id];
+        var base = state.plan.baseline[t.id];
+        var status = topicScheduleStatus(t.id);
+        var lbl = SCHED_LABEL[status];
+        var meta = '📅 ' + fmtDate(base.start) + ' – ' + fmtDate(base.end) + ' · max ' + base.days + 'd';
+        if (ts.state !== 'mastered' && adapt[t.id]) {
+          var a = adapt[t.id];
+          if (a.start !== base.start || a.end !== base.end) {
+            meta += '  ·  now ' + fmtDate(a.start) + ' – ' + fmtDate(a.end);
+          }
+        }
+        return (
+          '<div class="sched-row sched-row--' +
+          status +
+          '"><span class="sched-row__num mono">' +
+          (i + 1) +
+          '</span><div class="sched-row__main"><div class="sched-row__name">' +
+          esc(t.name) +
+          '</div><div class="sched-row__meta mono">' +
+          meta +
+          '</div></div><span class="badge badge--' +
+          lbl[1] +
+          '">' +
+          lbl[0] +
+          '</span></div>'
+        );
+      })
+      .join('');
+
+    return '<div class="card"><div class="section-label">' + esc(track.name) + '</div><div class="sched-list">' + rows + '</div></div>';
+  }
+
+  function renderTimeline() {
+    if (!state.plan) {
+      var opts = PLAN_MONTHS.map(function (m) {
+        return (
+          '<button class="plan-pill plan-pill--lg" data-plan-months="' +
+          m +
+          '">' +
+          m +
+          ' month' +
+          (m === 1 ? '' : 's') +
+          '</button>'
+        );
+      }).join('');
+      mainEl.innerHTML =
+        '<div class="fade-in"><div class="view-head"><h1>Timeline &amp; Schedule</h1>' +
+        '<p>Pick a target duration. Every topic across both tracks gets a start date, deadline, and a maximum number of days — and the plan re-balances itself as you progress.</p></div>' +
+        '<div class="card"><div class="section-label">Choose your target duration</div>' +
+        '<p class="plan-intro">A shorter plan means tighter daily deadlines; a longer plan spreads topics out. You can reset and re-pick any time.</p>' +
+        '<div class="plan-durations">' +
+        opts +
+        '</div></div></div>';
+      wirePlanControls(mainEl);
+      return;
+    }
+
+    var p = planProgress();
+    var pctDone = Math.round((p.done / p.totalTopics) * 100);
+    var statusTxt = p.overdue ? 'Timeline ended' : p.behind > 0 ? p.behind + ' behind' : 'On track';
+    var statusCls = p.overdue ? 'attempted' : p.behind > 0 ? 'revision' : 'mastered';
+
+    var summary =
+      '<div class="card"><div class="timeline-summary">' +
+      tlStat('Duration', state.plan.months + ' mo', fmtDate(p.pStart) + ' → ' + fmtDate(p.pEnd)) +
+      tlStat('Progress', 'Day ' + p.dayNum, 'of ' + p.total + ' days') +
+      tlStat('Mastered', p.done + '/' + p.totalTopics, pctDone + '% complete') +
+      tlStat('Status', statusTxt, p.overdue ? 'window closed' : 'across both tracks', statusCls) +
+      '</div>' +
+      '<div class="plan-card__foot" style="margin-top:6px;"><button class="btn btn--ghost" data-plan-reset>Reset &amp; re-pick duration</button></div>' +
+      '</div>';
+
+    mainEl.innerHTML =
+      '<div class="fade-in"><div class="view-head"><h1>Timeline &amp; Schedule</h1>' +
+      '<p>Deadlines per topic. Finish early and the freed days flow to the topics that remain.</p></div>' +
+      summary +
+      '<div style="margin-top:18px;">' +
+      trackScheduleList('java') +
+      '</div><div style="margin-top:18px;">' +
+      trackScheduleList('aptitude') +
+      '</div></div>';
+
+    wirePlanControls(mainEl);
+  }
+
+  function tlStat(label, big, sub, cls) {
+    return (
+      '<div class="tl-stat"><div class="tl-stat__label">' +
+      esc(label) +
+      '</div><div class="tl-stat__big mono' +
+      (cls ? ' tl-stat__big--' + cls : '') +
+      '">' +
+      esc(big) +
+      '</div><div class="tl-stat__sub">' +
+      esc(sub) +
+      '</div></div>'
+    );
+  }
+
+  // Wire the duration pills, "view timeline", and "reset" controls in a scope.
+  function wirePlanControls(scope) {
+    scope.querySelectorAll('[data-plan-months]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        createPlan(parseInt(btn.getAttribute('data-plan-months'), 10));
+      });
+    });
+    scope.querySelectorAll('[data-plan-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        navTo('timeline');
+      });
+    });
+    scope.querySelectorAll('[data-plan-reset]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        clearPlan();
+      });
+    });
+  }
+
   function renderDashboard() {
     var name = 'Bilal';
 
@@ -997,6 +1402,9 @@
       name +
       ' 👋</h1><p>Your placement prep at a glance.</p></div>' +
       '<div class="dash-grid">' +
+      planCard() +
+      '</div>' +
+      '<div class="dash-grid" style="margin-top:18px;">' +
       trackProgressCard('java') +
       trackProgressCard('aptitude') +
       '</div>' +
@@ -1009,6 +1417,8 @@
       recentActivityCard() +
       '</div>' +
       '</div>';
+
+    wirePlanControls(mainEl);
 
     // Wire "review now" buttons in the queue.
     mainEl.querySelectorAll('[data-review-now]').forEach(function (btn) {
