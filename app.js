@@ -547,6 +547,22 @@
   // In-memory session only — never persisted mid-attempt.
   var session = null;
 
+  // Randomise option order per question so the correct answer isn't positional.
+  function shuffleOptions(q) {
+    var order = shuffle([0, 1, 2, 3].slice(0, q.options.length));
+    var newOptions = order.map(function (i) {
+      return q.options[i];
+    });
+    var newCorrect = order.indexOf(q.correctIndex);
+    return {
+      id: q.id,
+      question: q.question,
+      options: newOptions,
+      correctIndex: newCorrect,
+      explanation: q.explanation
+    };
+  }
+
   function startQuiz(topicId, mode, trackId) {
     var def = getTopicDef(topicId);
     var topic = def.topic;
@@ -556,12 +572,13 @@
       topicId: topicId,
       trackId: trackId || def.track.id,
       mode: mode, // 'quiz' | 'review'
-      questions: pool.slice(0, count),
+      questions: pool.slice(0, count).map(shuffleOptions),
       answers: [], // selected index per question (null until chosen)
       index: 0,
       passThreshold: PASS
     };
     for (var i = 0; i < session.questions.length; i++) session.answers.push(null);
+    session.phase = 'quiz';
     renderQuiz();
     openOverlay('');
     overlayInner.innerHTML = '';
@@ -621,6 +638,7 @@
       opts +
       '</div>' +
       '<div class="quiz-foot">' +
+      '<span style="margin-right:auto;font-size:12px;color:var(--text-2);font-family:var(--font-mono);align-self:center;">Keys A–D / 1–4 · Enter</span>' +
       (selected != null
         ? '<button class="btn btn--primary" id="quizNext">' +
           (isLast ? 'Submit Quiz' : 'Next →') +
@@ -811,6 +829,7 @@
      Results view — score, verify attempt, AI prompt copy
      ============================================================ */
   function showResults(score, passed, def) {
+    session.phase = 'results';
     var ts = state.topics[session.topicId];
     var msg;
     if (session.mode === 'review') {
@@ -1217,6 +1236,45 @@
     var link = e.target.closest('.nav__link');
     if (!link) return;
     navTo(link.getAttribute('data-view'));
+  });
+
+  /* ---------- Keyboard support ---------- */
+  document.addEventListener('keydown', function (e) {
+    // Only act while the quiz/results overlay is open.
+    if (!overlayEl.classList.contains('is-open') || !session) return;
+
+    if (e.key === 'Escape') {
+      if (overlayInner.querySelector('#quitYes')) return; // confirm box already up
+      if (session.phase === 'quiz') confirmQuit();
+      else {
+        session = null;
+        closeOverlay();
+        render();
+      }
+      return;
+    }
+
+    if (session.phase !== 'quiz') return;
+
+    // 1-4 or A-D select an option.
+    var map = { '1': 0, '2': 1, '3': 2, '4': 3, a: 0, b: 1, c: 2, d: 3 };
+    var k = e.key.toLowerCase();
+    if (map[k] != null) {
+      var idx = map[k];
+      var q = session.questions[session.index];
+      if (idx < q.options.length) {
+        session.answers[session.index] = idx;
+        renderQuizInPlace();
+      }
+    } else if (e.key === 'Enter') {
+      if (session.answers[session.index] != null) {
+        if (session.index === session.questions.length - 1) submitQuiz();
+        else {
+          session.index++;
+          renderQuizInPlace();
+        }
+      }
+    }
   });
 
   /* ============================================================
