@@ -542,10 +542,294 @@
   }
 
   /* ============================================================
-     Quiz engine — added in the next milestone
+     Quiz engine
      ============================================================ */
-  function startQuiz() {
-    toast('Quiz engine', 'Coming in the next build step.', 'info', '⚙️');
+  // In-memory session only — never persisted mid-attempt.
+  var session = null;
+
+  function startQuiz(topicId, mode, trackId) {
+    var def = getTopicDef(topicId);
+    var topic = def.topic;
+    var pool = shuffle(topic.questions);
+    var count = mode === 'review' ? Math.min(AppData.reviewQuestionCount, pool.length) : pool.length;
+    session = {
+      topicId: topicId,
+      trackId: trackId || def.track.id,
+      mode: mode, // 'quiz' | 'review'
+      questions: pool.slice(0, count),
+      answers: [], // selected index per question (null until chosen)
+      index: 0,
+      passThreshold: PASS
+    };
+    for (var i = 0; i < session.questions.length; i++) session.answers.push(null);
+    renderQuiz();
+    openOverlay('');
+    overlayInner.innerHTML = '';
+    overlayInner.appendChild(quizNode);
+  }
+
+  var quizNode;
+  function renderQuiz() {
+    var q = session.questions[session.index];
+    var total = session.questions.length;
+    var num = session.index + 1;
+    var selected = session.answers[session.index];
+    var def = getTopicDef(session.topicId);
+    var isLast = session.index === total - 1;
+
+    var opts = q.options
+      .map(function (opt, i) {
+        var key = ['A', 'B', 'C', 'D'][i];
+        return (
+          '<button class="quiz-option ' +
+          (selected === i ? 'is-selected' : '') +
+          '" data-opt="' +
+          i +
+          '"><span class="quiz-option__key">' +
+          key +
+          '</span><span>' +
+          esc(opt) +
+          '</span></button>'
+        );
+      })
+      .join('');
+
+    var html =
+      '<div class="quiz-head">' +
+      '<span class="quiz-head__topic">' +
+      esc(def.topic.name) +
+      (session.mode === 'review' ? ' · Review' : '') +
+      '</span>' +
+      '<button class="quiz-head__close" id="quizClose" aria-label="Close quiz">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button></div>' +
+      '<div class="quiz-progress">' +
+      '<div class="quiz-progress__label"><span>Question ' +
+      num +
+      ' of ' +
+      total +
+      '</span><span>' +
+      Math.round((num / total) * 100) +
+      '%</span></div>' +
+      '<div class="progress"><div class="progress__fill" style="width:' +
+      (num / total) * 100 +
+      '%"></div></div></div>' +
+      '<div class="quiz-question">' +
+      formatQuestion(q.question) +
+      '</div>' +
+      '<div class="quiz-options">' +
+      opts +
+      '</div>' +
+      '<div class="quiz-foot">' +
+      (selected != null
+        ? '<button class="btn btn--primary" id="quizNext">' +
+          (isLast ? 'Submit Quiz' : 'Next →') +
+          '</button>'
+        : '<button class="btn btn--primary" disabled>' + (isLast ? 'Submit Quiz' : 'Next →') + '</button>') +
+      '</div>';
+
+    quizNode = el('<div>' + html + '</div>');
+
+    quizNode.querySelectorAll('.quiz-option').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        session.answers[session.index] = parseInt(btn.getAttribute('data-opt'), 10);
+        renderQuizInPlace();
+      });
+    });
+    var nextBtn = quizNode.querySelector('#quizNext');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function () {
+        if (isLast) submitQuiz();
+        else {
+          session.index++;
+          renderQuizInPlace();
+        }
+      });
+    }
+    quizNode.querySelector('#quizClose').addEventListener('click', function () {
+      confirmQuit();
+    });
+  }
+
+  function renderQuizInPlace() {
+    renderQuiz();
+    overlayInner.innerHTML = '';
+    overlayInner.appendChild(quizNode);
+  }
+
+  // Code-style questions contain newlines / snippets — render as <pre> when multiline.
+  function formatQuestion(text) {
+    if (text.indexOf('\n') !== -1) {
+      var parts = text.split('\n\n');
+      var head = esc(parts[0]);
+      var code = parts.slice(1).join('\n\n');
+      if (code) {
+        return (
+          '<div>' +
+          head +
+          '</div><pre style="font-family:var(--font-mono);font-size:14px;background:var(--surface-2);padding:14px 16px;border-radius:10px;margin-top:12px;overflow-x:auto;white-space:pre-wrap;">' +
+          esc(code) +
+          '</pre>'
+        );
+      }
+    }
+    return esc(text);
+  }
+
+  function confirmQuit() {
+    // No native confirm(): build the choice into the overlay.
+    var box = el(
+      '<div style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.5);z-index:10;">' +
+        '<div class="card" style="max-width:360px;text-align:center;">' +
+        '<h3 style="margin-bottom:8px;">Quit this quiz?</h3>' +
+        '<p style="color:var(--text-2);font-size:14px;margin-bottom:18px;">Your progress in this attempt will be lost.</p>' +
+        '<div style="display:flex;gap:10px;justify-content:center;">' +
+        '<button class="btn btn--ghost" id="quitCancel">Keep going</button>' +
+        '<button class="btn btn--primary" id="quitYes" style="background:var(--danger);">Quit</button>' +
+        '</div></div></div>'
+    );
+    overlayInner.appendChild(box);
+    box.querySelector('#quitCancel').addEventListener('click', function () {
+      box.remove();
+    });
+    box.querySelector('#quitYes').addEventListener('click', function () {
+      session = null;
+      closeOverlay();
+      render();
+    });
+  }
+
+  function submitQuiz() {
+    var correct = 0;
+    session.questions.forEach(function (q, i) {
+      if (session.answers[i] === q.correctIndex) correct++;
+    });
+    var total = session.questions.length;
+    var score = correct / total;
+    var passed = score >= PASS;
+
+    var ts = state.topics[session.topicId];
+    var def = getTopicDef(session.topicId);
+
+    ts.attempts = (ts.attempts || 0) + 1;
+    ts.scores.push(score);
+    if (ts.bestScore == null || score > ts.bestScore) ts.bestScore = score;
+
+    if (session.mode === 'review') {
+      handleReviewResult(passed, def);
+    } else {
+      handleQuizResult(passed, score, def);
+    }
+
+    // Studying today counts toward the streak.
+    markActiveToday();
+
+    // Activity log (latest first).
+    state.activity.unshift({
+      topicId: session.topicId,
+      trackId: session.trackId,
+      name: def.topic.name,
+      score: score,
+      passed: passed,
+      ts: Date.now(),
+      type: session.mode
+    });
+    if (state.activity.length > 30) state.activity = state.activity.slice(0, 30);
+
+    saveState();
+    showResults(score, passed, def);
+  }
+
+  function handleQuizResult(passed, score, def) {
+    var ts = state.topics[session.topicId];
+    if (passed) {
+      var firstTime = ts.state !== 'mastered';
+      ts.state = 'mastered';
+      ts.needsRevision = false;
+      ts.cooldownUntil = null;
+      if (firstTime || !ts.masteredAt) {
+        ts.masteredAt = Date.now();
+        ts.srIndex = 0;
+        ts.nextReviewDate = startOfDay(Date.now()) + SR[0] * DAY_MS;
+        unlockNext(session.trackId, session.topicId);
+      }
+      toast('Topic Mastered! 🎉', def.topic.name + ' — ' + pct(score) + '%', 'success', '🏆');
+    } else {
+      if (ts.state !== 'mastered') {
+        ts.state = 'attempted';
+        ts.cooldownUntil = Date.now() + COOLDOWN;
+      }
+      // If already mastered and a retake fails, mastery is preserved.
+    }
+  }
+
+  /* Review result handling lives with the SR scheduler (later milestone). */
+  function handleReviewResult(passed, def) {
+    // Placeholder until the spaced-repetition milestone wires this fully.
+    var ts = state.topics[session.topicId];
+    if (passed) {
+      toast('Review passed', def.topic.name, 'success', '✅');
+    } else {
+      toast('Review missed', def.topic.name, 'warning', '⚠️');
+    }
+    ts.nextReviewDate = null;
+  }
+
+  /* ============================================================
+     Results (basic) — verify + AI prompt added next milestone
+     ============================================================ */
+  function showResults(score, passed, def) {
+    var ts = state.topics[session.topicId];
+    var msg;
+    if (session.mode === 'review') {
+      msg = passed ? 'Review complete — great recall!' : 'Some gaps surfaced — keep revising.';
+    } else if (passed) {
+      msg = 'Topic Mastered! 🎉';
+    } else {
+      msg = 'You need ' + pct(PASS) + '% to master this topic.';
+    }
+
+    var cooldownHtml = '';
+    if (!passed && session.mode === 'quiz' && ts.cooldownUntil) {
+      cooldownHtml =
+        '<div class="result__msg">Try again in <span class="result__cooldown" data-cooldown="' +
+        ts.cooldownUntil +
+        '" data-topic="' +
+        session.topicId +
+        '">--:--:--</span></div>';
+    }
+
+    var html =
+      '<div class="quiz-head"><span class="quiz-head__topic">' +
+      esc(def.topic.name) +
+      ' · Results</span></div>' +
+      '<div class="result">' +
+      '<div class="result__score result__score--' +
+      (passed ? 'pass' : 'fail') +
+      ' mono">' +
+      pct(score) +
+      '%</div>' +
+      '<div class="result__state" style="color:var(--' +
+      (passed ? 'secondary' : 'danger') +
+      ')">' +
+      (passed ? 'PASSED' : 'NOT YET') +
+      '</div>' +
+      '<div class="result__msg">' +
+      esc(msg) +
+      '</div>' +
+      cooldownHtml +
+      '<div class="result__actions">' +
+      '<button class="btn btn--primary" id="resBack">Back to Roadmap</button>' +
+      '</div></div>';
+
+    overlayInner.innerHTML = html;
+    var back = overlayInner.querySelector('#resBack');
+    back.addEventListener('click', function () {
+      session = null;
+      closeOverlay();
+      render();
+    });
+    startCooldownTimers(overlayInner);
   }
 
   /* ============================================================
