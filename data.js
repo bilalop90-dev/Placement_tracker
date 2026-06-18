@@ -639,6 +639,78 @@
     javaById['java-rest'] //         16. REST API Design
   ];
 
+  /* ---------- NEW: Permutation, Combination & Probability ---------- */
+  var tProbability = {
+    id: 'apt-probability',
+    code: 'APT-11',
+    name: 'Permutation, Combination & Probability',
+    description:
+      'nPr, nCr, conditional probability, and Bayes basics — appears as 3-4 questions in TCS NQT Digital and Infosys SP aptitude sections.',
+    reviewPrompt:
+      "Act as a TCS Digital aptitude trainer testing Permutation, Combination & Probability. Pose ONE problem at a time with actual numbers. Cover nPr arrangements vs nCr selections, arrangements with and without repetition (word problems), circular permutations, complementary probability, independent events (P(A and B)), mutually exclusive events (P(A or B)), conditional probability P(A|B), and classic dice/coin problems. WAIT for my answer, then reveal the full working and the formula used. Increase difficulty gradually. After 10 questions give me a score out of 10 and tell me which sub-types to drill.",
+    questions: [
+      q('pr1', 'In how many ways can 3 people be seated in 3 of 5 chairs in a row (i.e. 5P3)?', ['60', '125', '10', '20'], 0, '5P3 = 5 × 4 × 3 = 60 arrangements.'),
+      q('pr2', 'In how many ways can a committee of 3 be chosen from 6 people (6C3)?', ['18', '20', '120', '15'], 1, '6C3 = 6!/(3!·3!) = 20.'),
+      q('pr3', 'How many distinct arrangements exist of the letters of the word "LEVEL"?', ['30', '60', '120', '20'], 0, '5!/(2!·2!) = 120/4 = 30, dividing by the repeats of L and E.'),
+      q('pr4', 'In how many ways can 5 people be seated around a circular table?', ['120', '24', '25', '60'], 1, 'Circular arrangements of n people = (n − 1)! = 4! = 24.'),
+      q('pr5', 'A bag has 4 red and 6 blue balls. The probability of NOT drawing a red ball in one draw is:', ['2/5', '3/5', '4/10', '1/2'], 1, 'P(not red) = 1 − 4/10 = 6/10 = 3/5.'),
+      q('pr6', 'Two fair coins are tossed. The probability of getting two heads is:', ['1/2', '1/4', '1/3', '3/4'], 1, 'Independent events multiply: (1/2) × (1/2) = 1/4.'),
+      q('pr7', 'A fair die is rolled once. The probability of getting a 2 or a 5 is:', ['1/6', '1/3', '1/2', '2/3'], 1, 'Mutually exclusive outcomes add: 1/6 + 1/6 = 2/6 = 1/3.'),
+      q('pr8', 'A card is drawn from a standard 52-card deck. Given that it is a face card, the probability it is a King is:', ['1/13', '1/3', '1/4', '4/52'], 1, 'Among the 12 face cards, 4 are Kings, so P(King | face) = 4/12 = 1/3.'),
+      q('pr9', 'Two fair dice are rolled. The probability that their sum is 7 is:', ['1/6', '1/9', '5/36', '1/12'], 0, 'There are 6 ways to total 7 out of 36 outcomes, giving 6/36 = 1/6.'),
+      q('pr10', "Bayes' theorem is primarily used to:", ['Count the number of arrangements', 'Update the probability of a hypothesis given new evidence', 'Find the average of a data set', 'Compute permutations of a set'], 1, "Bayes' theorem revises a prior probability into a posterior using observed evidence.")
+    ]
+  };
+
+  /* ---------- NEW: Geometry & Mensuration ---------- */
+  var tGeometry = {
+    id: 'apt-geometry',
+    code: 'APT-12',
+    name: 'Geometry & Mensuration',
+    description:
+      'Area, perimeter, volume, surface area formulas — appears in Wipro Turbo and HCL aptitude with 2-3 direct formula application questions.',
+    reviewPrompt:
+      "You are a Wipro/HCL aptitude trainer testing Geometry & Mensuration. Pose ONE problem at a time with actual numbers to compute. Cover triangle area (base-height and Heron's), circle area/circumference/sector, rectangle vs square, cube and cuboid volume and surface area, cylinder CSA/TSA/volume, cone slant height/CSA/TSA/volume, sphere and hemisphere, composite figures, and how area/volume scale when dimensions change. WAIT for my answer, then reveal the formula and full working. Increase difficulty. After 10 questions give me a score out of 10 and the shapes I should practise more.",
+    questions: [
+      q('ge1', 'The area of a triangle with base 10 cm and height 6 cm is:', ['30 cm²', '60 cm²', '16 cm²', '32 cm²'], 0, 'Area = ½ × base × height = ½ × 10 × 6 = 30 cm².'),
+      q('ge2', 'A triangle has sides 3 cm, 4 cm and 5 cm. Its area is:', ['12 cm²', '6 cm²', '7.5 cm²', '10 cm²'], 1, '3-4-5 is a right triangle, so area = ½ × 3 × 4 = 6 cm².'),
+      q('ge3', 'The circumference of a circle of radius 7 cm (take π = 22/7) is:', ['44 cm', '154 cm', '22 cm', '88 cm'], 0, 'Circumference = 2πr = 2 × 22/7 × 7 = 44 cm.'),
+      q('ge4', 'A square and a rectangle have the same perimeter of 40 cm. If the rectangle is 12 cm × 8 cm, which has the larger area?', ['The rectangle (96 cm²)', 'The square (100 cm²)', 'They are equal', 'Cannot be determined'], 1, 'Square side = 10 cm → area 100 cm²; rectangle area = 96 cm², so the square is larger.'),
+      q('ge5', 'The total surface area of a cube with edge 5 cm is:', ['150 cm²', '125 cm²', '100 cm²', '25 cm²'], 0, 'TSA of a cube = 6a² = 6 × 25 = 150 cm².'),
+      q('ge6', 'The volume of a cuboid measuring 8 × 5 × 3 cm is:', ['16 cm³', '120 cm³', '79 cm³', '40 cm³'], 1, 'Volume = l × b × h = 8 × 5 × 3 = 120 cm³.'),
+      q('ge7', 'The volume of a cylinder with radius 7 cm and height 10 cm (π = 22/7) is:', ['1540 cm³', '440 cm³', '220 cm³', '490 cm³'], 0, 'Volume = πr²h = 22/7 × 49 × 10 = 1540 cm³.'),
+      q('ge8', 'A cone has radius 3 cm and height 4 cm. Its slant height is:', ['7 cm', '5 cm', '25 cm', '12 cm'], 1, 'Slant height l = √(r² + h²) = √(9 + 16) = 5 cm.'),
+      q('ge9', 'The volume of a sphere is (4/3)πr³. If the radius is doubled, the volume becomes:', ['2 times', '4 times', '8 times', '6 times'], 2, 'Volume scales with r³, so doubling the radius multiplies the volume by 2³ = 8.'),
+      q('ge10', 'If each side of a square is increased by 10%, its area increases by:', ['10%', '20%', '21%', '100%'], 2, 'Area scales with side²; (1.1)² = 1.21, a 21% increase.')
+    ]
+  };
+
+  /* ---------- NEW: Advanced Logical Reasoning ---------- */
+  var tAdvLogical = {
+    id: 'apt-advlogical',
+    code: 'APT-13',
+    name: 'Advanced Logical Reasoning',
+    description:
+      'Syllogisms, binary logic, input-output machines, critical reasoning — what separates Digital scorers from Ninja scorers in the reasoning section.',
+    reviewPrompt:
+      "Act as a TCS Digital / Infosys SP reasoning trainer testing Advanced Logical Reasoning. Present ONE full problem at a time (state all clues in text) and DO NOT reveal any shortcut before I attempt. Cover three-statement syllogisms, binary truth-teller/liar logic, input-output machine pattern transformations, statement-and-assumptions, statement-and-conclusions, course-of-action, strengthen/weaken critical reasoning, number-coding patterns, calendar day-of-the-week logic, and linear sitting-arrangement deduction. WAIT for my answer, then explain the deduction step by step. Increase difficulty. End with a score out of 10 and which reasoning types I should drill.",
+    questions: [
+      q('al1', 'Statements: All cats are animals. All animals need water. Which conclusion DEFINITELY follows?', ['All animals are cats', 'All cats need water', 'Some water is cats', 'No cat needs water'], 1, 'Transitively, cats ⊂ animals ⊂ things that need water, so all cats need water.'),
+      q('al2', 'A always tells the truth; B always lies. A says "B is a liar." Is A\'s statement true?', ['Yes, it is true', 'No, it is false', 'It cannot be determined', 'Both are lying'], 0, 'Since B always lies, the statement "B is a liar" is true — consistent with A being a truth-teller.'),
+      q('al3', 'A machine transforms input "CAT" into "DBU". By the same rule, "DOG" becomes:', ['CNF', 'EPH', 'EPF', 'DPH'], 1, 'Each letter shifts forward by one (C→D, A→B, T→U), so DOG → EPH.'),
+      q('al4', "Statement: 'Submit the form online to avoid queues.' Which assumption is IMPLICIT?", ['Online submission is available and usable', 'Queues are enjoyable', 'No one has internet access', 'Forms can never be submitted offline'], 0, 'Advising online submission assumes that the online facility actually exists and can be used.'),
+      q('al5', "Statement: 'All trains were late due to heavy fog.' Conclusion: Fog can affect train schedules. Does it follow?", ['No, it does not follow', 'Yes, it follows', 'Data is insufficient', 'Only partially'], 1, 'The statement directly attributes the delay to fog, so the conclusion logically follows.'),
+      q('al6', 'Problem: A city faces frequent water shortages every summer. Which is a logical COURSE OF ACTION?', ['Ban all use of water', 'Implement rainwater harvesting and storage', 'Ignore the problem', 'Relocate the entire city'], 1, 'Rainwater harvesting practically addresses the shortage, unlike the extreme or passive alternatives.'),
+      q('al7', "Argument: 'Our new ad campaign caused sales to rise.' Which statement most WEAKENS it?", ['Sales also rose for competitors who ran no campaign', 'The campaign aired during prime-time TV', 'The company spent heavily on the campaign', 'Customers enjoyed the campaign jingle'], 0, 'If competitors without a campaign saw the same rise, the campaign is unlikely to be the cause.'),
+      q('al8', "If 'RUN' is coded by letter position as 18-21-14, then 'GO' is coded as:", ['6-14', '7-15', '7-14', '8-15'], 1, 'Using alphabetical positions, G is the 7th letter and O the 15th, giving 7-15.'),
+      q('al9', '1st January 2024 is a Monday. What day is 1st February 2024? (January has 31 days)', ['Wednesday', 'Thursday', 'Friday', 'Monday'], 1, '31 days = 4 weeks + 3 odd days, so Monday + 3 = Thursday.'),
+      q('al10', 'Five people sit in seats numbered 1-5. C is in the middle seat and A is immediately to the right of C. Which seat is A in?', ['Seat 2', 'Seat 4', 'Seat 3', 'Seat 5'], 1, 'C occupies the middle seat 3, so "immediately to the right" places A in seat 4.')
+    ]
+  };
+
+  // Append the three new topics to the END of the Aptitude track.
+  aptitude.topics = aptitude.topics.concat([tProbability, tGeometry, tAdvLogical]);
+
   /* ============================================================
      Export
      ============================================================ */
