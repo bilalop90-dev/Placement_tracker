@@ -776,7 +776,7 @@
   }
 
   /* ============================================================
-     Results (basic) — verify + AI prompt added next milestone
+     Results view — score, verify attempt, AI prompt copy
      ============================================================ */
   function showResults(score, passed, def) {
     var ts = state.topics[session.topicId];
@@ -799,6 +799,10 @@
         '">--:--:--</span></div>';
     }
 
+    var correctCount = session.questions.reduce(function (acc, q, i) {
+      return acc + (session.answers[i] === q.correctIndex ? 1 : 0);
+    }, 0);
+
     var html =
       '<div class="quiz-head"><span class="quiz-head__topic">' +
       esc(def.topic.name) +
@@ -817,19 +821,101 @@
       '<div class="result__msg">' +
       esc(msg) +
       '</div>' +
+      '<div class="result__msg mono">' +
+      correctCount +
+      ' / ' +
+      session.questions.length +
+      ' correct</div>' +
       cooldownHtml +
       '<div class="result__actions">' +
+      '<button class="btn btn--outline" id="resVerify">Verify Attempt</button>' +
+      '<button class="btn btn--ghost" id="resCopy">Copy AI Review Prompt</button>' +
       '<button class="btn btn--primary" id="resBack">Back to Roadmap</button>' +
-      '</div></div>';
+      '</div>' +
+      '<div class="verify" id="verifyArea" hidden></div>' +
+      '</div>';
 
     overlayInner.innerHTML = html;
-    var back = overlayInner.querySelector('#resBack');
-    back.addEventListener('click', function () {
+
+    overlayInner.querySelector('#resBack').addEventListener('click', function () {
       session = null;
       closeOverlay();
       render();
     });
+    overlayInner.querySelector('#resCopy').addEventListener('click', function () {
+      copyPrompt(session.topicId);
+    });
+    var verifyBtn = overlayInner.querySelector('#resVerify');
+    var verifyArea = overlayInner.querySelector('#verifyArea');
+    verifyBtn.addEventListener('click', function () {
+      if (verifyArea.hasAttribute('hidden')) {
+        verifyArea.innerHTML = buildVerify();
+        verifyArea.removeAttribute('hidden');
+        verifyBtn.textContent = 'Hide Verification';
+        verifyArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        verifyArea.setAttribute('hidden', '');
+        verifyBtn.textContent = 'Verify Attempt';
+      }
+    });
+
     startCooldownTimers(overlayInner);
+  }
+
+  function buildVerify() {
+    return session.questions
+      .map(function (q, i) {
+        var chosen = session.answers[i];
+        var opts = q.options
+          .map(function (opt, oi) {
+            var key = ['A', 'B', 'C', 'D'][oi];
+            var cls = '';
+            var mark = '';
+            if (oi === q.correctIndex) {
+              cls = 'verify__opt--correct';
+              mark = '✓ Correct';
+            }
+            if (oi === chosen && chosen !== q.correctIndex) {
+              cls = 'verify__opt--wrong';
+              mark = '✗ Your answer';
+            } else if (oi === chosen && chosen === q.correctIndex) {
+              mark = '✓ Your answer';
+            }
+            return (
+              '<div class="verify__opt ' +
+              cls +
+              '"><span class="verify__opt-key">' +
+              key +
+              '</span><span>' +
+              esc(opt) +
+              '</span>' +
+              (mark ? '<span class="verify__opt-mark">' + mark + '</span>' : '') +
+              '</div>'
+            );
+          })
+          .join('');
+
+        var wrong = chosen !== q.correctIndex;
+        var unanswered = chosen == null;
+        var expClass = wrong || unanswered ? '' : '';
+
+        return (
+          '<div class="verify__q">' +
+          '<div class="verify__q-text"><span class="verify__q-num mono">Q' +
+          (i + 1) +
+          '.</span>' +
+          formatQuestion(q.question) +
+          '</div>' +
+          opts +
+          '<div class="verify__exp"' +
+          expClass +
+          '><b>Why:</b> ' +
+          esc(q.explanation) +
+          '</div>' +
+          '</div>'
+        );
+      })
+      .join('');
   }
 
   /* ============================================================
