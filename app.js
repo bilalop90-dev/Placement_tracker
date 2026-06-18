@@ -763,16 +763,48 @@
     }
   }
 
-  /* Review result handling lives with the SR scheduler (later milestone). */
-  function handleReviewResult(passed, def) {
-    // Placeholder until the spaced-repetition milestone wires this fully.
-    var ts = state.topics[session.topicId];
-    if (passed) {
-      toast('Review passed', def.topic.name, 'success', '✅');
+  /* ============================================================
+     Spaced-repetition scheduler
+     Intervals SR = [1, 3, 7, 14, 30] days after mastering.
+     ============================================================ */
+  function scheduleNextReview(ts) {
+    if (ts.srIndex < SR.length) {
+      ts.nextReviewDate = startOfDay(Date.now()) + SR[ts.srIndex] * DAY_MS;
     } else {
-      toast('Review missed', def.topic.name, 'warning', '⚠️');
+      // Completed the whole ladder — topic graduates from the queue.
+      ts.nextReviewDate = null;
     }
-    ts.nextReviewDate = null;
+  }
+
+  function handleReviewResult(passed, def) {
+    var ts = state.topics[session.topicId];
+    // Mastered status is never lost on review.
+    if (passed) {
+      ts.needsRevision = false;
+      ts.srIndex = Math.min(ts.srIndex + 1, SR.length); // advance the ladder
+      scheduleNextReview(ts);
+      var when = ts.nextReviewDate ? formatReview(ts.nextReviewDate).toLowerCase() : 'no more reviews needed';
+      toast('Review passed ✅', def.topic.name + ' — next review ' + when, 'success', '🧠');
+    } else {
+      ts.needsRevision = true; // flag, but keep mastered
+      ts.nextReviewDate = startOfDay(Date.now()) + DAY_MS; // retry tomorrow
+      toast('Flagged for revision', def.topic.name + ' — review again tomorrow.', 'warning', '⚠️');
+    }
+  }
+
+  /* Topics whose review is due today or overdue. */
+  function dueTopics() {
+    var due = [];
+    eachTopic(function (topic, track) {
+      if (isDue(topic.id)) {
+        due.push({ topic: topic, track: track, ts: state.topics[topic.id] });
+      }
+    });
+    // Most overdue first.
+    due.sort(function (a, b) {
+      return a.ts.nextReviewDate - b.ts.nextReviewDate;
+    });
+    return due;
   }
 
   /* ============================================================
