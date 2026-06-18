@@ -87,10 +87,24 @@
       var raw = localStorage.getItem(STATE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        // Make sure any newly added topics exist in stored state.
-        eachTopic(function (topic, track, idx) {
-          if (!parsed.topics[topic.id]) {
-            parsed.topics[topic.id] = defaultState().topics[topic.id];
+        var def = defaultState();
+        // Additive migration — never overwrites existing progress.
+        if (!parsed.topics) parsed.topics = {};
+        if (!parsed.streak) parsed.streak = def.streak;
+        if (!parsed.activity) parsed.activity = [];
+        // Add any newly introduced topics (e.g. v1.1 expansion) as locked,
+        // and backfill any missing fields on existing topic entries.
+        eachTopic(function (topic) {
+          var stored = parsed.topics[topic.id];
+          if (!stored) {
+            parsed.topics[topic.id] = def.topics[topic.id];
+          } else {
+            var d = def.topics[topic.id];
+            for (var key in d) {
+              if (Object.prototype.hasOwnProperty.call(d, key) && stored[key] === undefined) {
+                stored[key] = d[key];
+              }
+            }
           }
         });
         return parsed;
