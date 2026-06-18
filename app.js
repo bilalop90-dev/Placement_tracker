@@ -951,17 +951,218 @@
   }
 
   /* ============================================================
-     Dashboard — fleshed out in a later milestone
+     Dashboard
      ============================================================ */
   function renderDashboard() {
     var name = 'Bilal';
+
     mainEl.innerHTML =
-      '<div class="fade-in"><div class="view-head"><h1>' +
+      '<div class="fade-in">' +
+      '<div class="view-head"><h1>' +
       greeting() +
       ', ' +
       name +
       ' 👋</h1><p>Your placement prep at a glance.</p></div>' +
-      '<div class="empty"><span class="empty__icon">📊</span>Dashboard widgets are coming together.</div></div>';
+      '<div class="dash-grid">' +
+      trackProgressCard('java') +
+      trackProgressCard('aptitude') +
+      '</div>' +
+      '<div class="dash-grid dash-grid--3" style="margin-top:18px;">' +
+      streakCard() +
+      reviewQueueCard() +
+      weakestCard() +
+      '</div>' +
+      '<div style="margin-top:18px;">' +
+      recentActivityCard() +
+      '</div>' +
+      '</div>';
+
+    // Wire "review now" buttons in the queue.
+    mainEl.querySelectorAll('[data-review-now]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var topicId = btn.getAttribute('data-review-now');
+        var def = getTopicDef(topicId);
+        startQuiz(topicId, 'review', def.track.id);
+      });
+    });
+    // Wire "go to topic" jumps.
+    mainEl.querySelectorAll('[data-goto]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var parts = btn.getAttribute('data-goto').split('|');
+        selectedTopicId = parts[1];
+        navTo(parts[0]);
+      });
+    });
+  }
+
+  function trackProgressCard(trackId) {
+    var track = AppData.tracks[trackId];
+    var topics = track.topics;
+    var mastered = topics.filter(function (t) {
+      return state.topics[t.id].state === 'mastered';
+    }).length;
+    var p = (mastered / topics.length) * 100;
+    var nextTopic = topics.find(function (t) {
+      var st = state.topics[t.id].state;
+      return st === 'unlocked' || st === 'attempted';
+    });
+    var meta = nextTopic ? 'Up next: ' + esc(nextTopic.name) : mastered === topics.length ? 'Track complete! 🎉' : 'Keep going';
+
+    return (
+      '<div class="card track-card">' +
+      '<div class="track-card__top"><span class="track-card__name">' +
+      esc(track.name) +
+      '</span><span class="track-card__count"><b>' +
+      mastered +
+      '</b>/' +
+      topics.length +
+      ' mastered</span></div>' +
+      '<div class="progress"><div class="progress__fill ' +
+      (p === 100 ? 'progress__fill--success' : '') +
+      '" style="width:' +
+      p +
+      '%"></div></div>' +
+      '<div class="track-card__meta">' +
+      meta +
+      '</div>' +
+      '<div style="margin-top:14px;"><button class="btn btn--outline" data-goto="' +
+      trackId +
+      '|">Open track →</button></div>' +
+      '</div>'
+    );
+  }
+
+  function streakCard() {
+    return (
+      '<div class="card streak-card">' +
+      '<div class="section-label">Study Streak</div>' +
+      '<div class="stat-row"><span class="stat-big mono">' +
+      state.streak.count +
+      '</span><span class="stat-sub">day' +
+      (state.streak.count === 1 ? '' : 's') +
+      ' in a row 🔥</span></div>' +
+      '<div class="track-card__meta" style="margin-top:12px;">Best streak: <b>' +
+      state.streak.best +
+      '</b> day' +
+      (state.streak.best === 1 ? '' : 's') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function reviewQueueCard() {
+    var due = dueTopics();
+    var body;
+    if (!due.length) {
+      body = '<div class="empty"><span class="empty__icon">✅</span>No reviews due. You\'re all caught up.</div>';
+    } else {
+      body = due
+        .slice(0, 6)
+        .map(function (d) {
+          return (
+            '<div class="due-chip"><div><div class="due-chip__name">' +
+            esc(d.topic.name) +
+            '</div><div class="due-chip__track">' +
+            esc(d.track.short) +
+            (d.ts.needsRevision ? ' · revision' : '') +
+            '</div></div>' +
+            '<button class="btn btn--success" style="padding:7px 14px;" data-review-now="' +
+            d.topic.id +
+            '">Review</button></div>'
+          );
+        })
+        .join('');
+    }
+    return (
+      '<div class="card"><div class="section-label">Due Today (' +
+      due.length +
+      ')</div>' +
+      body +
+      '</div>'
+    );
+  }
+
+  function weakestCard() {
+    var ranked = [];
+    eachTopic(function (topic, track) {
+      var ts = state.topics[topic.id];
+      var avg = avgScore(ts);
+      if (avg != null) ranked.push({ topic: topic, track: track, avg: avg });
+    });
+    ranked.sort(function (a, b) {
+      return a.avg - b.avg;
+    });
+    var top3 = ranked.slice(0, 3);
+
+    var body;
+    if (!top3.length) {
+      body = '<div class="empty"><span class="empty__icon">🌱</span>Take a quiz to surface weak areas.</div>';
+    } else {
+      body = top3
+        .map(function (r) {
+          var cls = r.avg >= PASS ? 'score-tag--pass' : 'score-tag--fail';
+          return (
+            '<div class="list-item"><div class="list-item__main"><span class="list-item__title">' +
+            esc(r.topic.name) +
+            '</span><span class="list-item__sub">' +
+            esc(r.track.short) +
+            ' · avg over ' +
+            state.topics[r.topic.id].scores.length +
+            ' attempt' +
+            (state.topics[r.topic.id].scores.length === 1 ? '' : 's') +
+            '</span></div>' +
+            '<span class="score-tag ' +
+            cls +
+            ' mono">' +
+            pct(r.avg) +
+            '%</span></div>'
+          );
+        })
+        .join('');
+    }
+    return '<div class="card"><div class="section-label">Weakest Topics</div>' + body + '</div>';
+  }
+
+  function recentActivityCard() {
+    var acts = state.activity.slice(0, 5);
+    var body;
+    if (!acts.length) {
+      body = '<div class="empty"><span class="empty__icon">📝</span>No attempts yet — start your first quiz.</div>';
+    } else {
+      body = acts
+        .map(function (a) {
+          var cls = a.passed ? 'score-tag--pass' : 'score-tag--fail';
+          return (
+            '<div class="list-item"><div class="list-item__main"><span class="list-item__title">' +
+            esc(a.name) +
+            (a.type === 'review' ? ' · review' : '') +
+            '</span><span class="list-item__sub">' +
+            timeAgo(a.ts) +
+            ' · ' +
+            (a.passed ? 'Passed' : 'Missed') +
+            '</span></div>' +
+            '<span class="score-tag ' +
+            cls +
+            ' mono">' +
+            pct(a.score) +
+            '%</span></div>'
+          );
+        })
+        .join('');
+    }
+    return '<div class="card"><div class="section-label">Recent Activity</div>' + body + '</div>';
+  }
+
+  function timeAgo(ts) {
+    var diff = Date.now() - ts;
+    var mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    if (days === 1) return 'yesterday';
+    return days + 'd ago';
   }
 
   function greeting() {
