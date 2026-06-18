@@ -634,8 +634,8 @@
     var html =
       '<div class="quiz-head">' +
       '<span class="quiz-head__topic">' +
+      (session.mode === 'review' ? 'Review Session · ' : '') +
       esc(def.topic.name) +
-      (session.mode === 'review' ? ' · Review' : '') +
       '</span>' +
       '<button class="quiz-head__close" id="quizClose" aria-label="Close quiz">' +
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
@@ -879,7 +879,8 @@
     var html =
       '<div class="quiz-head"><span class="quiz-head__topic">' +
       esc(def.topic.name) +
-      ' · Results</span></div>' +
+      (session.mode === 'review' ? ' · Review Complete' : ' · Results') +
+      '</span></div>' +
       '<div class="result">' +
       '<div class="result__score result__score--' +
       (passed ? 'pass' : 'fail') +
