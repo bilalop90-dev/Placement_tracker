@@ -75,8 +75,9 @@
         attempts: 0,
         masteredAt: null,
         nextReviewDate: null,
-        srIndex: 0,
+        srIndex: 0, // index into SR ladder == reviewIntervalIndex
         needsRevision: false,
+        reviewHistory: [], // { date, score, passed }
         cooldownUntil: null
       };
     });
@@ -753,7 +754,7 @@
     if (ts.bestScore == null || score > ts.bestScore) ts.bestScore = score;
 
     if (session.mode === 'review') {
-      handleReviewResult(passed, def);
+      handleReviewResult(passed, score, def);
     } else {
       handleQuizResult(passed, score, def);
     }
@@ -813,9 +814,9 @@
     }
   }
 
-  function handleReviewResult(passed, def) {
+  function handleReviewResult(passed, score, def) {
     var ts = state.topics[session.topicId];
-    // Mastered status is never lost on review.
+    // Mastered status is never lost on review, and no subsequent topic is re-locked.
     if (passed) {
       ts.needsRevision = false;
       ts.srIndex = Math.min(ts.srIndex + 1, SR.length); // advance the ladder
@@ -827,6 +828,8 @@
       ts.nextReviewDate = startOfDay(Date.now()) + DAY_MS; // retry tomorrow
       toast('Flagged for revision', def.topic.name + ' — review again tomorrow.', 'warning', '⚠️');
     }
+    if (!ts.reviewHistory) ts.reviewHistory = [];
+    ts.reviewHistory.push({ date: Date.now(), score: score, passed: passed });
   }
 
   /* Topics whose review is due today or overdue. */
