@@ -572,6 +572,52 @@
     ]
   };
 
+  /* ---------- NEW: DBMS Concepts ---------- */
+  var tDbms = {
+    id: 'java-dbms',
+    code: 'JAVA-15',
+    name: 'DBMS Concepts',
+    description:
+      'Normalization, ER diagrams, keys, transactions, ACID properties — asked in every Infosys SP and TCS Digital technical interview.',
+    reviewPrompt:
+      "Act as an Infosys SP / TCS Digital DBMS interviewer. Quiz me interactively: distinguishing primary, foreign, candidate and super keys; identifying 1NF/2NF/3NF violations with examples; when a 3NF table is not BCNF; reading ER diagrams (entity, attribute, relationship, cardinality); applying the ACID properties to scenarios; transaction isolation levels (dirty read, phantom read); deadlock conditions; clustered vs non-clustered indexing; the four JOIN types; and trigger vs stored procedure. Ask ONE question at a time — favour scenario questions over definitions. WAIT for my answer, then explain. Escalate difficulty. End with a score out of 10 and weak areas.",
+    questions: [
+      q('db1', 'Which key is the chosen candidate key that uniquely identifies each row and cannot be NULL?', ['Foreign key', 'Primary key', 'Super key', 'Alternate key'], 1, 'The primary key is the selected candidate key that uniquely identifies rows and disallows NULL values.'),
+      q('db2', 'A super key that contains no redundant attribute (no proper subset is also a super key) is called a:', ['Foreign key', 'Candidate key', 'Composite key', 'Partial key'], 1, 'A candidate key is a minimal super key — removing any attribute would break its uniqueness.'),
+      q('db3', 'A table violates 1NF when:', ['It has a composite primary key', 'It has a foreign key', 'A column stores multiple values (non-atomic) in a single cell', 'It is not indexed'], 2, '1NF requires atomic values; a cell holding multiple values or a repeating group violates it.'),
+      q('db4', '2NF (applied to a 1NF table) removes:', ['Transitive dependencies', 'Partial dependencies of a non-key attribute on part of a composite key', 'All foreign keys', 'Multivalued dependencies'], 1, '2NF eliminates partial dependencies where a non-key attribute depends on only part of a composite key.'),
+      q('db5', '3NF eliminates ____ dependencies.', ['Transitive', 'Partial', 'Functional', 'Trivial'], 0, '3NF removes transitive dependencies, where a non-key attribute depends on another non-key attribute.'),
+      q('db6', 'A table can be in 3NF but NOT in BCNF when:', ['It has no candidate keys at all', 'A non-trivial functional dependency exists whose determinant is not a super key', 'It contains duplicate rows', 'Every attribute is a prime attribute'], 1, 'BCNF requires every determinant to be a super key; a 3NF table with a non-super-key determinant fails BCNF.'),
+      q('db7', 'In an ER diagram, an ellipse (oval) represents a(n):', ['Attribute', 'Entity', 'Relationship', 'Primary-key constraint'], 0, 'Ellipses denote attributes; rectangles represent entities and diamonds represent relationships.'),
+      q('db8', 'Which ACID property guarantees that a transaction either completes fully or has no effect at all?', ['Atomicity', 'Consistency', 'Isolation', 'Durability'], 0, 'Atomicity makes a transaction all-or-nothing, rolling back any partial effects on failure.'),
+      q('db9', "A 'dirty read' occurs when a transaction:", ['Reads data already committed by another transaction', 'Reads uncommitted changes made by another transaction that may later be rolled back', 'Writes to two tables at once', 'Reads back its own earlier writes'], 1, "A dirty read sees another transaction's uncommitted data, which is invalid if that transaction rolls back."),
+      q('db10', 'Which statement about a clustered index is correct?', ['It determines the physical order of rows, so a table can have only one', 'A table can have many clustered indexes', 'It stores a separate full copy of the table data', 'It is the same thing as a foreign key'], 0, 'A clustered index defines the physical ordering of rows, so each table can have at most one.')
+    ]
+  };
+
+  /* ---------- NEW: OS & CN Fundamentals ---------- */
+  var tOscn = {
+    id: 'java-oscn',
+    code: 'JAVA-16',
+    name: 'OS & CN Fundamentals',
+    description:
+      'Process management, memory, OSI model, TCP/IP — standard filler in every Digital/SP technical interview round after the coding section.',
+    reviewPrompt:
+      "You are a placement technical interviewer testing OS & Computer Networks fundamentals. Quiz me interactively: process vs thread and memory sharing; the four deadlock conditions (mutual exclusion, hold-and-wait, no preemption, circular wait); CPU scheduling (FCFS, SJF, Round Robin) with small numeric examples; paging vs segmentation; virtual memory and page faults; the OSI 7 layers and which protocol lives where; TCP vs UDP trade-offs; HTTP vs HTTPS and port numbers; DNS resolution; and IPv4 classes and private ranges. Ask ONE question at a time — mix concept MCQs with short numeric scheduling problems. WAIT for my answer, then explain. End with a score out of 10 and weak spots.",
+    questions: [
+      q('os1', 'Which statement about processes and threads is correct?', ['Threads of the same process share the same heap/memory space', 'Each thread always has a completely separate memory space', 'Two processes share memory by default', 'Threads of a process cannot run concurrently'], 0, 'Threads within a process share its heap and code, while separate processes have isolated memory.'),
+      q('os2', 'Which of these is one of the four necessary conditions for deadlock?', ['Preemption is always allowed', 'Circular wait', 'Resources are unlimited', 'Only a single process runs'], 1, 'Deadlock requires mutual exclusion, hold-and-wait, no preemption, and circular wait.'),
+      q('os3', 'Under First-Come-First-Served, processes arrive in order P1(burst 4), P2(burst 2), P3(burst 1). The average waiting time is:', ['3.33', '2.0', '4.0', '6.0'], 0, 'Waiting times are 0, 4 and 6; the average is (0+4+6)/3 = 10/3 ≈ 3.33.'),
+      q('os4', 'When you type a URL in a browser, DNS is responsible for:', ['Encrypting the page contents', 'Resolving the domain name into an IP address', 'Compressing the HTML', 'Performing the TCP three-way handshake'], 1, "DNS translates a human-readable domain name into the server's numeric IP address."),
+      q('os5', 'The main purpose of paging is to:', ['Divide memory into variable-sized logical segments', 'Eliminate external fragmentation using fixed-size blocks (frames/pages)', 'Increase the CPU clock speed', 'Encrypt main memory'], 1, 'Paging uses fixed-size pages and frames, removing external fragmentation (unlike variable-size segmentation).'),
+      q('os6', 'A page fault occurs when:', ['The CPU overheats', 'A referenced page is not currently in physical memory (RAM)', 'Two processes deadlock', 'The disk runs out of space'], 1, 'A page fault is raised when a referenced page is on disk rather than in RAM, so the OS must load it.'),
+      q('os7', 'In the OSI model, logical IP addressing and routing happen at the:', ['Data Link layer', 'Network layer', 'Transport layer', 'Session layer'], 1, 'The Network layer (Layer 3) handles logical addressing (IP) and routing between networks.'),
+      q('os8', 'Which statement about UDP (compared with TCP) is correct?', ['UDP guarantees ordered, reliable delivery', 'UDP is connectionless and faster but does not guarantee delivery', 'UDP uses a three-way handshake', 'UDP is always slower than TCP'], 1, 'UDP is connectionless with no delivery or ordering guarantees, trading reliability for lower latency.'),
+      q('os9', 'The default port numbers for HTTP and HTTPS respectively are:', ['80 and 443', '443 and 80', '21 and 22', '8080 and 80'], 0, 'HTTP uses port 80 and HTTPS uses port 443 (HTTP secured with TLS/SSL).'),
+      q('os10', 'Which IPv4 range is reserved for PRIVATE addresses?', ['8.0.0.0 – 8.255.255.255', '192.168.0.0 – 192.168.255.255', '1.1.1.0 – 1.1.1.255', '100.0.0.0 – 100.255.255.255'], 1, '192.168.0.0/16 is a reserved private range, along with 10.0.0.0/8 and 172.16.0.0/12.')
+    ]
+  };
+
   /* Re-sequence the Java Dev Track to the v1.1 roadmap order.
      Existing topics keep their content; only their position changes. */
   java.topics = [
@@ -586,9 +632,11 @@
     javaById['java-generics'], //     9. Generics
     javaById['java-streams'], //     10. Java Streams & Lambdas
     javaById['java-threads'], //     11. Multithreading Basics
-    javaById['java-jdbc'], //        12. SQL & JDBC
-    javaById['java-spring'], //      13. Spring Boot Basics
-    javaById['java-rest'] //         14. REST API Design
+    tDbms, //                        12. DBMS Concepts (NEW)
+    javaById['java-jdbc'], //        13. SQL & JDBC
+    tOscn, //                        14. OS & CN Fundamentals (NEW)
+    javaById['java-spring'], //      15. Spring Boot Basics
+    javaById['java-rest'] //         16. REST API Design
   ];
 
   /* ============================================================
